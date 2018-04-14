@@ -1,0 +1,4 @@
+org.springframework.boot.autoconfigure.EnableAutoConfiguration=\
+  io.github.arvinrong.mds.springboot.autoconfiguration.MultiDataSourceAutoConfiguration,\
+  io.github.arvinrong.mds.springboot.autoconfiguration.MultiDataSourceTransactionManagerAutoConfiguration,\
+  io.github.arvinrong.mds.springboot.autoconfiguration.MybatisMultiDataSourceAutoConfiguration
