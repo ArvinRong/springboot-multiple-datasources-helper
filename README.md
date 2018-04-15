@@ -4,7 +4,7 @@ Usually it needs to create cumstom datasource beans by using "@Configuration" cl
 
 SpringBoot-multiple-datasources-helper helps us introduce multiple datasources integrated with Mybatis through configuration of type yaml and a little coding works. It's designed to get us take less effort to add any number datasources into our SpringBoot project without effecting creating process of main datasource bean and other relevant beans that be managed by SpringBoot autoconfiguration. 
 
-### Only Tomcat and HikariCP db connection pool supported for cumstom datasources..
+### Only Tomcat and HikariCP db connection pool supported for custom datasources..
 
 ## Installation
 
