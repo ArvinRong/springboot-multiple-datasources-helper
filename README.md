@@ -67,16 +67,17 @@ SpringBoot-multiple-datasources-helper packages as a jar using Maven.
    import org.springframework.context.annotation.Configuration;
    
    @Configuration
-   @MapperScan(basePackages = "io.github.arvinrong.db1.mapper", sqlSessionTemplateRef = "**db1SqlSessionTemplate**")
-   `public class Db1MapperScanerConfig {}`
+   @MapperScan(basePackages = "io.github.arvinrong.db1.mapper", sqlSessionTemplateRef = "db1SqlSessionTemplate")
+   public class Db1MapperScanerConfig {}
+   
    
    ### Class Db2MapperScanerConfig
    import org.mybatis.spring.annotation.MapperScan;
    import org.springframework.context.annotation.Configuration;
    
    @Configuration
-   @MapperScan(basePackages = "io.github.arvinrong.db2.mapper", sqlSessionTemplateRef = "**db2SqlSessionTemplate**")
-   `public class Db2MapperScanerConfig {}`
+   @MapperScan(basePackages = "io.github.arvinrong.db2.mapper", sqlSessionTemplateRef = "db2SqlSessionTemplate")
+   public class Db2MapperScanerConfig {}
    ```
 Tips: Beans named of **db1SqlSessionTemplate** and **db2SqlSessionTemplate** are created automatically, the name convention is datasource name+"SqlSessionTemplate", and datasource name is defined in yml file above. Through this configuration class, each mapper class can use respective SqlSessionTemplate object with corresponding datasource in it.
 
