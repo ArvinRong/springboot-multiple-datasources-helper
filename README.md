@@ -43,22 +43,22 @@ SpringBoot-multiple-datasources-helper packages as a jar using Maven.
              remove-abandoned: true
          -
            driver-class-name: com.microsoft.sqlserver.jdbc.SQLServerDriver
-             name: db2
-             url: jdbc:sqlserver://127.0.0.1:1433;databasename=MASTER
-             username: sa
-             password: "test@2016%%"
-             type: org.apache.tomcat.jdbc.pool.DataSource
-             tomcat:
-               max-active: 20
-               max-idle: 5
-               max-wait: 120000
-               test-while-idle: true
-               validation-query: select 1
-               validation-query-timeout: 1
-               test-on-borrow: true
-               test-on-return: false
-               remove-abandoned-timeout: 180
-               remove-abandoned: true
+           name: db2
+           url: jdbc:sqlserver://127.0.0.1:1433;databasename=MASTER
+           username: sa
+           password: "test@2016%%"
+           type: org.apache.tomcat.jdbc.pool.DataSource
+           tomcat:
+             max-active: 20
+             max-idle: 5
+             max-wait: 120000
+             test-while-idle: true
+             validation-query: select 1
+             validation-query-timeout: 1
+             test-on-borrow: true
+             test-on-return: false
+             remove-abandoned-timeout: 180
+             remove-abandoned: true
    ```
 4. Defining @MapperScan for each datasource including main datasource which defined under "spring.datasource". I usually add @MapperScan annotation in **WebApplication class which our main method located in for main datasource, then create config classes for every custom datasources respectively. Below is demo for the two custom datasources defined in yml file above.
    ```markdown
