@@ -44,7 +44,7 @@ public class MultiDataSourceHolder {
     }
 
     public void addDataSource(String dataSourceName, DataSource dataSource) {
-        if (dataSourceName == null && dataSource == null && !multiDataSources.containsKey(dataSourceName)) {
+        if (dataSourceName != null && dataSource != null && !multiDataSources.containsKey(dataSourceName)) {
             multiDataSources.put(dataSourceName, dataSource);
         }
     }
