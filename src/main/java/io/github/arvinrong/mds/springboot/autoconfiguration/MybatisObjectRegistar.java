@@ -26,89 +26,70 @@ import org.springframework.beans.factory.config.ConstructorArgumentValues;
 import org.springframework.beans.factory.support.AbstractBeanDefinition;
 import org.springframework.beans.factory.support.BeanDefinitionRegistry;
 import org.springframework.beans.factory.support.GenericBeanDefinition;
-import org.springframework.beans.factory.support.RootBeanDefinition;
+import org.springframework.context.EnvironmentAware;
 import org.springframework.context.annotation.ImportBeanDefinitionRegistrar;
-import org.springframework.core.io.ClassPathResource;
-import org.springframework.core.io.Resource;
-import org.springframework.core.io.support.EncodedResource;
+import org.springframework.core.env.Environment;
 import org.springframework.core.type.AnnotationMetadata;
 import org.springframework.util.StringUtils;
-import org.yaml.snakeyaml.Yaml;
-
-import java.io.IOException;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Iterator;
+import java.util.List;
 
 
 public class MybatisObjectRegistar {
 
 
-    public static class Registar implements ImportBeanDefinitionRegistrar {
+    public static class Registar implements ImportBeanDefinitionRegistrar, EnvironmentAware {
         private static final String BEAN_NAME = "mybatisObjectPostProcessor";
+        private Environment environment;
 
         @Override
         public void registerBeanDefinitions(AnnotationMetadata importingClassMetadata, BeanDefinitionRegistry registry) {
-            List<String> dataSoruceNames = null;
-            try {
-                GenericBeanDefinition beanDefinition = new GenericBeanDefinition();
-                beanDefinition.setBeanClass(MybatisObjectPostProcessor.class);
-                beanDefinition.setRole(BeanDefinition.ROLE_INFRASTRUCTURE);
-                beanDefinition.setSynthetic(true);
-                registry.registerBeanDefinition(BEAN_NAME, beanDefinition);
-                if (registry.getBeanDefinition("sqlSessionFactory") != null) {
-                    registry.getBeanDefinition("sqlSessionFactory").setPrimary(true);
-                }
-                if (registry.getBeanDefinition("sqlSessionTemplate") != null) {
-                    registry.getBeanDefinition("sqlSessionTemplate").setPrimary(true);
-                }
+            GenericBeanDefinition beanDefinition = new GenericBeanDefinition();
+            beanDefinition.setBeanClass(MybatisObjectPostProcessor.class);
+            beanDefinition.setRole(BeanDefinition.ROLE_INFRASTRUCTURE);
+            beanDefinition.setSynthetic(true);
+            registry.registerBeanDefinition(BEAN_NAME, beanDefinition);
+            if (registry.containsBeanDefinition("sqlSessionFactory")) {
+                registry.getBeanDefinition("sqlSessionFactory").setPrimary(true);
+            }
+            if (registry.containsBeanDefinition("sqlSessionTemplate")) {
+                registry.getBeanDefinition("sqlSessionTemplate").setPrimary(true);
+            }
 
-                Resource yamlRes = new ClassPathResource("/application.yaml");
-                Resource ymlRes = new ClassPathResource("/application.yml");
-                boolean yamlExists = yamlRes.exists();
-                boolean ymlExists = ymlRes.exists();
-                Object ymlProperties = null;
-                if (yamlExists) {
-                    ymlProperties = new Yaml().load(
-                            (new EncodedResource(yamlRes, "UTF-8").getInputStream()));
-                } else if (ymlExists) {
-                    ymlProperties = new Yaml().load(
-                            (new EncodedResource(ymlRes, "UTF-8").getInputStream()));
-                } else {
-                    throw new IllegalStateException("Using yaml configuration for multi datasources feature.");
+            List<String> dataSoruceNames = resolveDataSourceNames();
+            if (!dataSoruceNames.isEmpty()) {
+                Iterator<String> iterator = dataSoruceNames.iterator();
+                while (iterator.hasNext()) {
+                    String dataSourceKey = iterator.next();
+                    createSqlSessionFactoryBeanDef(registry, dataSourceKey);
+                    createSqlSessionTemplateBeanDef(registry, dataSourceKey);
                 }
-                dataSoruceNames = resolveDataBaseNames(ymlProperties);
-                if (dataSoruceNames != null && dataSoruceNames.size() > 0) {
-                    Iterator<String> iterator = dataSoruceNames.iterator();
-                    while (iterator.hasNext()) {
-                        String dataSourceKey = iterator.next();
-                        createSqlSessionFactoryBeanDef(registry, dataSourceKey);
-                        createSqlSessionTemplateBeanDef(registry, dataSourceKey);
-                    }
-                }
-
-            } catch (IOException e) {
-                throw new IllegalStateException("Multi datasources feature failed to initialized.", e);
             }
 
         }
 
-        private List<String> resolveDataBaseNames(Object ymlProperties) {
+        private List<String> resolveDataSourceNames() {
             List<String> result = new ArrayList<>();
-            try {
-                Map<String, Map<String, Map<String, Object>>> dataSourcesProperties = (Map<String, Map<String, Map<String, Object>>>) ymlProperties;
-                if (dataSourcesProperties.get("system").get("db").get("data-sources") != null) {
-                    List<Map<String, String>> dataSourcesList = (List<Map<String, String>>) dataSourcesProperties.get("system").get("db").get("data-sources");
-                    Iterator<Map<String, String>> iterator = dataSourcesList.iterator();
-                    while (iterator.hasNext()) {
-                        Map<String, String> dataSrouce = iterator.next();
-                        if (dataSrouce != null && !StringUtils.isEmpty(dataSrouce.get("name"))) {
-                            result.add(dataSrouce.get("name"));
-                        }
-                    }
+            if (environment == null) {
+                return result;
+            }
+            int misses = 0;
+            for (int i = 0; i < 1000 && misses < 50; i++) {
+                String name = environment.getProperty("system.db.data-sources[" + i + "].name");
+                if (StringUtils.hasText(name)) {
+                    result.add(name);
+                    misses = 0;
+                } else {
+                    misses++;
                 }
-            } catch (Exception e) {
-                throw new IllegalStateException("Multi datasources feature failed to initialized , failed to resolve database name.", e);
             }
             return result;
+        }
+
+        @Override
+        public void setEnvironment(Environment environment) {
+            this.environment = environment;
         }
 
         private void createSqlSessionTemplateBeanDef(BeanDefinitionRegistry registry, String sqlSessionTemplateKey) {

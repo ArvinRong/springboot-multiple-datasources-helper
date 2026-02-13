@@ -143,7 +143,10 @@ public class MultiDataSourceInitializer {
             registry.registerBeanDefinition(customDataSourceBeanName, beanDefinition);
             dataSources.put(customDataSourceBeanName, dataSource);
             multiDataSourceHolder.getMultiDataSources().put(customDataSourceBeanName, dataSource);
-            multiDataSourceHolder.getMultiDataSourcePoolPropertyPrefixes().put(customDataSourceBeanName, getPropertyPrefixPattern(customDataSourceProperties.getType().getName(), index));
+            String dataSourceTypeName = customDataSourceProperties.getType() != null
+                    ? customDataSourceProperties.getType().getName()
+                    : dataSource.getClass().getName();
+            multiDataSourceHolder.getMultiDataSourcePoolPropertyPrefixes().put(customDataSourceBeanName, getPropertyPrefixPattern(dataSourceTypeName, index));
             beanFactory.getBean(customDataSourceBeanName);
         }
     }

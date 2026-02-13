@@ -42,8 +42,6 @@ public class MultiDataSourceTransactionManagerAutoConfiguration {
 
     public final static String TRANSACTION_MGR_MAPPER_KEY_SUFFIX = "TransactionManager";
 
-    private static Boolean isInitialized = false;
-
     @Configuration
     static class MultiDataSourceTransactionManagerConfiguration {
 
@@ -61,9 +59,11 @@ public class MultiDataSourceTransactionManagerAutoConfiguration {
                     .getIfAvailable();
         }
 
+        private boolean initialized = false;
+
         @PostConstruct
         public void init() {
-            if (isInitialized) {
+            if (initialized) {
                 return;
             }
             Set<String> multiDataSourceHolderKeySet = multiDataSourceHolder.getMultiDataSources().keySet();
@@ -77,7 +77,7 @@ public class MultiDataSourceTransactionManagerAutoConfiguration {
                 }
                 createPlatformTransactionManagerBean(dataSourceKey + TRANSACTION_MGR_MAPPER_KEY_SUFFIX, transactionManager);
             }
-            isInitialized = true;
+            initialized = true;
         }
 
         private void createPlatformTransactionManagerBean(String transactionManagerBeanName, PlatformTransactionManager transactionManager) {
