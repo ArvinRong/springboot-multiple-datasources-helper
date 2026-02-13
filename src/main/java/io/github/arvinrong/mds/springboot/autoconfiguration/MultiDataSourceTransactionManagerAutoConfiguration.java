@@ -29,7 +29,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.datasource.DataSourceTransactionManager;
 import org.springframework.transaction.PlatformTransactionManager;
 
-import javax.annotation.PostConstruct;
+import jakarta.annotation.PostConstruct;
 import javax.sql.DataSource;
 import java.util.Iterator;
 import java.util.Set;
@@ -41,8 +41,6 @@ import java.util.Set;
 public class MultiDataSourceTransactionManagerAutoConfiguration {
 
     public final static String TRANSACTION_MGR_MAPPER_KEY_SUFFIX = "TransactionManager";
-
-    private static Boolean isInitialized = false;
 
     @Configuration
     static class MultiDataSourceTransactionManagerConfiguration {
@@ -61,9 +59,11 @@ public class MultiDataSourceTransactionManagerAutoConfiguration {
                     .getIfAvailable();
         }
 
+        private boolean initialized = false;
+
         @PostConstruct
         public void init() {
-            if (isInitialized) {
+            if (initialized) {
                 return;
             }
             Set<String> multiDataSourceHolderKeySet = multiDataSourceHolder.getMultiDataSources().keySet();
@@ -77,7 +77,7 @@ public class MultiDataSourceTransactionManagerAutoConfiguration {
                 }
                 createPlatformTransactionManagerBean(dataSourceKey + TRANSACTION_MGR_MAPPER_KEY_SUFFIX, transactionManager);
             }
-            isInitialized = true;
+            initialized = true;
         }
 
         private void createPlatformTransactionManagerBean(String transactionManagerBeanName, PlatformTransactionManager transactionManager) {

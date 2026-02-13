@@ -17,7 +17,7 @@ package io.github.arvinrong.mds.springboot.autoconfiguration;
 
 import org.springframework.beans.factory.BeanClassLoaderAware;
 import org.springframework.beans.factory.BeanCreationException;
-import org.springframework.boot.autoconfigure.jdbc.DataSourceBuilder;
+import org.springframework.boot.jdbc.DataSourceBuilder;
 import org.springframework.boot.autoconfigure.jdbc.DataSourceProperties;
 import org.springframework.boot.autoconfigure.jdbc.EmbeddedDatabaseConnection;
 import org.springframework.boot.context.properties.ConfigurationProperties;
@@ -37,20 +37,26 @@ import java.util.*;
 public class MultiDataSourceProperties implements BeanClassLoaderAware, EnvironmentAware {
     public static final String MULTI_DATA_SOURCE_PREFIX = "system.db";
 
-    private static ClassLoader classLoader;
+    private ClassLoader classLoader;
 
-    private static Environment environment;
+    private Environment environment;
 
     private List<CustomDataSource> dataSources = new ArrayList<>();
 
     @Override
     public void setBeanClassLoader(ClassLoader classLoader) {
         this.classLoader = classLoader;
+        for (CustomDataSource dataSource : this.dataSources) {
+            dataSource.setClassLoader(classLoader);
+        }
     }
 
     @Override
     public void setEnvironment(Environment environment) {
         this.environment = environment;
+        for (CustomDataSource dataSource : this.dataSources) {
+            dataSource.setEnvironment(environment);
+        }
     }
 
     public List<CustomDataSource> getDataSources() {
@@ -59,6 +65,10 @@ public class MultiDataSourceProperties implements BeanClassLoaderAware, Environm
 
     public void setDataSources(List<CustomDataSource> dataSources) {
         this.dataSources = dataSources;
+        for (CustomDataSource dataSource : this.dataSources) {
+            dataSource.setClassLoader(this.classLoader);
+            dataSource.setEnvironment(this.environment);
+        }
     }
 
     public static class CustomDataSource {
@@ -174,13 +184,25 @@ public class MultiDataSourceProperties implements BeanClassLoaderAware, Environm
          * this instance
          */
         public DataSourceBuilder initializeDataSourceBuilder() {
-            return DataSourceBuilder.create(getClassLoader()).type(getType())
+            return DataSourceBuilder.create(getClassLoader() != null ? getClassLoader() : Thread.currentThread().getContextClassLoader()).type(getType())
                     .driverClassName(determineDriverClassName()).url(determineUrl())
                     .username(determineUsername()).password(determinePassword());
         }
 
+        private ClassLoader classLoader;
+
+        private Environment environment;
+
+        void setClassLoader(ClassLoader classLoader) {
+            this.classLoader = classLoader;
+        }
+
+        void setEnvironment(Environment environment) {
+            this.environment = environment;
+        }
+
         public ClassLoader getClassLoader() {
-            return classLoader;
+            return this.classLoader;
         }
 
         public String getName() {
@@ -245,7 +267,7 @@ public class MultiDataSourceProperties implements BeanClassLoaderAware, Environm
 
             if (!StringUtils.hasText(driverClassName)) {
                 throw new CustomDataSource.DataSourceBeanCreationException(this.embeddedDatabaseConnection,
-                        environment, "driver class");
+                        this.environment, "driver class");
             }
             return driverClassName;
         }
@@ -288,7 +310,7 @@ public class MultiDataSourceProperties implements BeanClassLoaderAware, Environm
             String url = this.embeddedDatabaseConnection.getUrl(determineDatabaseName());
             if (!StringUtils.hasText(url)) {
                 throw new CustomDataSource.DataSourceBeanCreationException(this.embeddedDatabaseConnection,
-                        environment, "url");
+                        this.environment, "url");
             }
             return url;
         }

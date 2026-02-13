@@ -18,20 +18,18 @@ package io.github.arvinrong.mds.springboot.autoconfiguration;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.springframework.beans.BeansException;
-import org.springframework.beans.factory.*;
+import org.springframework.beans.factory.BeanCreationException;
+import org.springframework.beans.factory.BeanFactory;
 import org.springframework.beans.factory.config.BeanDefinition;
 import org.springframework.beans.factory.config.BeanPostProcessor;
 import org.springframework.beans.factory.config.ConfigurableBeanFactory;
 import org.springframework.beans.factory.support.BeanDefinitionRegistry;
 import org.springframework.beans.factory.support.GenericBeanDefinition;
-import org.springframework.boot.bind.PropertiesConfigurationFactory;
+import org.springframework.boot.context.properties.bind.Bindable;
+import org.springframework.boot.context.properties.bind.Binder;
+import org.springframework.context.EnvironmentAware;
 import org.springframework.context.annotation.ImportBeanDefinitionRegistrar;
-import org.springframework.context.support.PropertySourcesPlaceholderConfigurer;
-import org.springframework.core.convert.support.DefaultConversionService;
-import org.springframework.core.env.ConfigurableEnvironment;
-import org.springframework.core.env.MutablePropertySources;
-import org.springframework.core.env.PropertySource;
-import org.springframework.core.env.PropertySources;
+import org.springframework.core.env.Environment;
 import org.springframework.core.type.AnnotationMetadata;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.util.ClassUtils;
@@ -41,18 +39,17 @@ import javax.sql.DataSource;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
-import java.util.Map;
 
 
-public class MultiDataSourceInitializerPostProcessor implements BeanPostProcessor, InitializingBean {
+public class MultiDataSourceInitializerPostProcessor implements BeanPostProcessor, EnvironmentAware {
 
     private static final Log logger = LogFactory
             .getLog(MultiDataSourceInitializerPostProcessor.class);
 
-    private List<String> multiDataSourceBeanNameList = new ArrayList<>();
-    private List<String> multiDataSourcePlatformTransactionManagerList = new ArrayList<>();
-    private BeanFactory beanFactory;
-    private PropertySources propertySources;
+    private final List<String> multiDataSourceBeanNameList = new ArrayList<>();
+    private final List<String> multiDataSourcePlatformTransactionManagerList = new ArrayList<>();
+    private final BeanFactory beanFactory;
+    private Environment environment;
 
     MultiDataSourceInitializerPostProcessor(MultiDataSourceProperties properties, BeanFactory beanFactory) {
         this.beanFactory = beanFactory;
@@ -66,35 +63,6 @@ public class MultiDataSourceInitializerPostProcessor implements BeanPostProcesso
     }
 
     @Override
-    public void afterPropertiesSet() {
-        if (this.propertySources == null) {
-            PropertySourcesPlaceholderConfigurer configurer = getSinglePropertySourcesPlaceholderConfigurer();
-            if (configurer != null) {
-                this.propertySources = new MultiDataSourceInitializerPostProcessor.FlatPropertySources(configurer.getAppliedPropertySources());
-            }
-        }
-    }
-
-    private PropertySourcesPlaceholderConfigurer getSinglePropertySourcesPlaceholderConfigurer() {
-        // Take care not to cause early instantiation of all FactoryBeans
-        if (this.beanFactory instanceof ListableBeanFactory) {
-            ListableBeanFactory listableBeanFactory = (ListableBeanFactory) this.beanFactory;
-            Map<String, PropertySourcesPlaceholderConfigurer> beans = listableBeanFactory
-                    .getBeansOfType(PropertySourcesPlaceholderConfigurer.class, false,
-                            false);
-            if (beans.size() == 1) {
-                return beans.values().iterator().next();
-            }
-            if (beans.size() > 1 && logger.isWarnEnabled()) {
-                logger.warn("Multiple PropertySourcesPlaceholderConfigurer "
-                        + "beans registered " + beans.keySet()
-                        + ", falling back to Environment");
-            }
-        }
-        return null;
-    }
-
-    @Override
     public Object postProcessBeforeInitialization(Object bean, String beanName) throws BeansException {
         return bean;
     }
@@ -103,7 +71,7 @@ public class MultiDataSourceInitializerPostProcessor implements BeanPostProcesso
     public Object postProcessAfterInitialization(Object bean, String beanName) throws BeansException {
         if (bean instanceof DataSource) {
             if ("dataSource".equals(beanName)) {
-                //Set dataSource bean which defined as default by SrpingBoot to be primary one.
+                // Set dataSource bean which defined as default by SpringBoot to be primary one.
                 ((ConfigurableBeanFactory) beanFactory).getMergedBeanDefinition(beanName).setPrimary(true);
             } else if (multiDataSourceBeanNameList.contains(beanName)) {
                 MultiDataSourceHolder multiDataSourceHolder = (MultiDataSourceHolder) beanFactory.getBean("multiDataSourceHolder");
@@ -137,25 +105,21 @@ public class MultiDataSourceInitializerPostProcessor implements BeanPostProcesso
 
     private void bindProperties(Object bean, String beanName, String prefix) {
         Object target = bean;
-        PropertiesConfigurationFactory<Object> factory = new PropertiesConfigurationFactory<Object>(
-                target);
-        factory.setPropertySources(this.propertySources);
-        // If no explicit conversion service is provided we add one so that (at least)
-        // comma-separated arrays of convertibles can be bound automatically
-        factory.setConversionService(new DefaultConversionService());
-        factory.setIgnoreInvalidFields(false);
-        factory.setIgnoreUnknownFields(true);
-        factory.setIgnoreNestedProperties(false);
-        if (StringUtils.hasLength(prefix)) {
-            factory.setTargetName(prefix);
+        if (target == null || !StringUtils.hasLength(prefix) || environment == null) {
+            return;
         }
         try {
-            factory.bindPropertiesToTarget();
+            Binder.get(environment).bind(prefix, Bindable.ofInstance(target));
         } catch (Exception ex) {
             String targetClass = ClassUtils.getShortName(target.getClass());
             throw new BeanCreationException(beanName, "Could not bind properties to "
                     + targetClass, ex);
         }
+    }
+
+    @Override
+    public void setEnvironment(Environment environment) {
+        this.environment = environment;
     }
 
     static class Registrar implements ImportBeanDefinitionRegistrar {
@@ -173,60 +137,9 @@ public class MultiDataSourceInitializerPostProcessor implements BeanPostProcesso
                 // cascade of bean instantiation that we would rather avoid.
                 beanDefinition.setSynthetic(true);
                 registry.registerBeanDefinition(BEAN_NAME, beanDefinition);
-                if (registry.getBeanDefinition("dataSource") != null) {
+                if (registry.containsBeanDefinition("dataSource")) {
                     registry.getBeanDefinition("dataSource").setPrimary(true);
                 }
-            }
-        }
-
-    }
-
-    /**
-     * Convenience class to flatten out a tree of property sources without losing the
-     * reference to the backing data (which can therefore be updated in the background).
-     */
-    private static class FlatPropertySources implements org.springframework.core.env.PropertySources {
-
-        private org.springframework.core.env.PropertySources propertySources;
-
-        FlatPropertySources(org.springframework.core.env.PropertySources propertySources) {
-            this.propertySources = propertySources;
-        }
-
-        @Override
-        public Iterator<PropertySource<?>> iterator() {
-            MutablePropertySources result = getFlattened();
-            return result.iterator();
-        }
-
-        @Override
-        public boolean contains(String name) {
-            return get(name) != null;
-        }
-
-        @Override
-        public PropertySource<?> get(String name) {
-            return getFlattened().get(name);
-        }
-
-        private MutablePropertySources getFlattened() {
-            MutablePropertySources result = new MutablePropertySources();
-            for (PropertySource<?> propertySource : this.propertySources) {
-                flattenPropertySources(propertySource, result);
-            }
-            return result;
-        }
-
-        private void flattenPropertySources(PropertySource<?> propertySource,
-                                            MutablePropertySources result) {
-            Object source = propertySource.getSource();
-            if (source instanceof ConfigurableEnvironment) {
-                ConfigurableEnvironment environment = (ConfigurableEnvironment) source;
-                for (PropertySource<?> childSource : environment.getPropertySources()) {
-                    flattenPropertySources(childSource, result);
-                }
-            } else {
-                result.addLast(propertySource);
             }
         }
 
